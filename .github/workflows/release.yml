@@ -31,7 +31,7 @@ jobs:
       run: git config --global --list
 
     - name: Verify git access
-      run: git ls-remote https://github.com/viantonugroho11/go-boilerplate.git
+      run: git ls-remote https://github.com/viantonugroho11/go-config-library.git
 
     - name: Cache Go modules
       uses: actions/cache@v2
