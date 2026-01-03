@@ -6,11 +6,18 @@ options:
   commits:
     filters:
       exclude:
-        - "^docs: "
         - "^test: "
-        - "^chore: "
   commit_groups:
-    order: ["feat", "fix", "perf", "revert", "refactor", "docs", "test", "chore"]
+    title_maps:
+      feat: "Features"
+      fix: "Bug Fixes"
+      perf: "Performance"
+      refactor: "Refactoring"
+      revert: "Reverts"
+      docs: "Documentation"
+      test: "Tests"
+      chore: "Chores"
+    order: ["feat", "fix", "perf", "refactor", "revert", "docs", "test", "chore"]
   header:
     pattern: "(.*)"
     pattern_maps:

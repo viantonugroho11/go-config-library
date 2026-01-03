@@ -1,4 +1,6 @@
 name: CI/CD Pipeline
+permissions:
+  contents: write
 
 on:
   push:
@@ -56,6 +58,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -72,17 +76,29 @@ jobs:
 
     - name: Generate Changelog
       run: |
-        git-chglog -o CHANGELOG.md
-        TAG=$(git describe --tags --always)
-        echo "Update changelog for $TAG"
-        sed -i "1s/^/## $TAG\n\n/" CHANGELOG.md
+        git fetch --tags --force
+        LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        if [ -z "$LAST_TAG" ]; then
+          NEW_TAG="v0.1.0"
+        else
+          VERSION=${LAST_TAG#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          PATCH=$((PATCH + 1))
+          NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+        fi
+        echo "NEXT_TAG=$NEW_TAG" >> $GITHUB_ENV
+        git-chglog --next-tag "$NEW_TAG" -o CHANGELOG.md
 
     - name: Commit Changelog
       run: |
         git config --global user.name 'github-actions'
         git config --global user.email 'github-actions@github.com'
-        git add CHANGELOG.md  # Staging file yang ingin di-commit
-        git commit -m "Update CHANGELOG.md"
+        git add CHANGELOG.md
+        if git diff --cached --quiet; then
+          echo "No changes to commit."
+        else
+          git commit -m "chore(changelog): update for $NEXT_TAG"
+        fi
       env:
         GITHUB_TOKEN: ${{ secrets.TOKENGITHUB }}
 
@@ -110,21 +126,24 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Create Build Tag
       if: github.event_name == 'push'
       run: |
-        git fetch --prune --unshallow
-        LAST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1))
-        echo "Last tag: $LAST_TAG"
-        VERSION=${LAST_TAG//v/}
-        echo "Current version: $VERSION"
-        IFS='.' read -r -a VERSION_PARTS <<< "$VERSION"
-        PATCH=${VERSION_PARTS[2]}
-        PATCH=$((PATCH + 1))
-        NEW_TAG="v${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.$PATCH"
-        echo "New tag: $NEW_TAG"
-        git tag $NEW_TAG
-        git push origin $NEW_TAG
+        git fetch --tags --force
+        LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        if [ -z "$LAST_TAG" ]; then
+          NEW_TAG="v0.1.0"
+        else
+          VERSION=${LAST_TAG#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          PATCH=$((PATCH + 1))
+          NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+        fi
+        echo "Tagging $NEW_TAG"
+        git tag "$NEW_TAG"
+        git push origin "$NEW_TAG"
       env:
         GITHUB_TOKEN: ${{ secrets.TOKENGITHUB }}
